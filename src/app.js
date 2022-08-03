@@ -1,6 +1,4 @@
-// import fs from "fs";
-// import inquirer from "inquirer";
-// import readline from "readline";
+import fs from "fs";
 
 // The top-secret algorithm is:
 // If the length of the shipment's destination street name is even, the base suitability score (SS) is the number of vowels in the driver’s
@@ -15,23 +13,17 @@
 // containing the names of the drivers. The output should be the total SS and a matching between shipment destinations and drivers. You do not
 // need to worry about malformed input, but you should certainly handle both upper and lower case names.
 
-let address = "123 Fake street, new jersey, nye";
-let driverName = "Joaquin Phoeniix";
-
-let hollowAddress = address.toLowerCase().replace(/\s+/g, "");
-let hollowDriverName = driverName.toLowerCase().replace(/\s+/g, "");
-
-let shipmentDestinationAddressEven = () => {
+let shipmentDestinationAddressEven = (hollowAddress) => {
   let length = hollowAddress.length;
   return length % 2 == 0;
 };
 
-const driverNumberOfVowels = () => {
+const driverNumberOfVowels = (hollowDriverName) => {
   const name = hollowDriverName.match(/[aeiou]/gi);
   return name === null ? 0 : name.length;
 };
 
-const driverNumberOfConsonants = () => {
+const driverNumberOfConsonants = (hollowDriverName) => {
   const name = hollowDriverName.match(/[bcdfghjklmnpqrstvwxyz]/gi);
   return name === null ? 0 : name.length;
 };
@@ -46,40 +38,77 @@ const commonFactorsBesides1 = (num) => {
   return array;
 };
 
-const baseSuitabilityScore = () => {
-  let score = shipmentDestinationAddressEven()
-    ? driverNumberOfVowels() * 1.5
-    : driverNumberOfConsonants();
+const baseSuitabilityScore = (hollowAddress, hollowDriverName) => {
+  let score = shipmentDestinationAddressEven(hollowAddress)
+    ? driverNumberOfVowels(hollowDriverName) * 1.5
+    : driverNumberOfConsonants(hollowDriverName);
   return score;
 };
 
-const hasCommonFactors = () => {
+const hasCommonFactors = (hollowAddress, hollowDriverName) => {
   const addressFactors = commonFactorsBesides1(hollowAddress.length);
   const nameFactors = commonFactorsBesides1(hollowDriverName.length);
-  console.log(addressFactors, nameFactors);
-
-  // return addressFactors.includes((factor, i) => factor === nameFactors[i]);
+  // console.log("hasCommonFactors", addressFactors, nameFactors);
 
   return addressFactors.some((factor) => nameFactors.includes(factor));
 };
 
-const finalSuitabilityScore = () => {
-  let score = baseSuitabilityScore();
-  if (hasCommonFactors()) {
-    score = baseSuitabilityScore() * 1.5;
+const finalSuitabilityScore = (hollowAddress, hollowDriverName) => {
+  let score = baseSuitabilityScore(hollowAddress, hollowDriverName);
+  if (hasCommonFactors(hollowAddress, hollowDriverName)) {
+    score = baseSuitabilityScore(hollowAddress, hollowDriverName) * 1.5;
   }
   return score;
 };
 
-console.log(
-  driverNumberOfConsonants(),
-  driverNumberOfVowels(),
-  "shipmentDestinationAddressEven",
-  shipmentDestinationAddressEven(),
-  "hasCommonFactors",
-  hasCommonFactors(),
-  "baseSuitabilityScore",
-  baseSuitabilityScore(),
-  "finalSuitabilityScore",
-  finalSuitabilityScore()
-);
+const readExternalData = (path) => {
+  let res;
+  try {
+    const jsonString = fs.readFileSync(path);
+    const response = JSON.parse(jsonString);
+    res = response.data;
+  } catch (err) {
+    console.log("Error parsing JSON string:", err);
+  }
+  return res;
+};
+
+let drivers = await readExternalData("./data/drivers.json");
+let destinations = await readExternalData("./data/destinations.json");
+
+const driversAndDestinations = () => {
+  let sScoreCounter = 0;
+  let totalScore = 0;
+  let finalSSArr = [];
+  let maxSSIndex;
+  const matchObj = {
+    driver: "",
+    address: "",
+  };
+  let destinationResult = [];
+  destinations.map((addressObj) => {
+    drivers.forEach((nameObj) => {
+      const hollowAddress = addressObj.address
+        .toLowerCase()
+        .replace(/\s+/g, "");
+      const hollowDriverName = nameObj.name.toLowerCase().replace(/\s+/g, "");
+      const finalSS = finalSuitabilityScore(hollowAddress, hollowDriverName);
+      // console.log("finalSS", finalSS);
+      finalSSArr.push(finalSS);
+      sScoreCounter = Math.max(...finalSSArr);
+      maxSSIndex = finalSSArr.indexOf(sScoreCounter);
+      totalScore += finalSS;
+    });
+    finalSSArr.length = 0;
+    matchObj.driver = drivers[maxSSIndex].name;
+    matchObj.address = addressObj.address;
+    destinationResult.push(matchObj);
+
+    drivers.splice(maxSSIndex, 1);
+    console.log("Best Destination Match:", matchObj);
+  });
+  console.log("Total Score:", totalScore);
+  return totalScore;
+};
+
+driversAndDestinations();
